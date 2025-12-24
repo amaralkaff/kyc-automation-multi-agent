@@ -7,8 +7,8 @@ AI-powered Know Your Customer (KYC) verification using Google's Agent Developmen
 | Layer | Technology |
 |-------|------------|
 | **AI Agents** | Python + Vertex AI (Gemini 2.0 Flash) + FastAPI |
-| **Backend** | Java 17 + Spring Boot 3 + PostgreSQL |
-| **Frontend** | Next.js 15 + TypeScript + shadcn/ui |
+| **Backend** | Java 21 + Spring Boot 3 + PostgreSQL |
+| **Frontend** | Next.js 16 + TypeScript + shadcn/ui |
 
 ## Architecture
 
