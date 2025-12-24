@@ -12,7 +12,7 @@ AI-powered Know Your Customer (KYC) verification using Google's Agent Developmen
 
 ## Architecture
 
-![KYC Multi-Agent Architecture](docs/architecture.png)
+![KYC Multi-Agent Architecture](docs/KYC_Agentic_Workflow_Architecture.png)
 
 ### Agent Workflow
 1. **User Request** → Initiates KYC verification
