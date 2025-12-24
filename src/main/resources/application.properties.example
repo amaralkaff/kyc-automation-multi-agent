@@ -1,0 +1,26 @@
+# KYC Automation Backend Configuration Template
+# Copy this file to application-local.properties and fill in your values
+
+spring.application.name=kyc-automation
+
+# Database Configuration (Local PostgreSQL)
+spring.datasource.url=jdbc:postgresql://localhost:5432/kycdb
+spring.datasource.driverClassName=org.postgresql.Driver
+spring.datasource.username=${DB_USERNAME:postgres}
+spring.datasource.password=${DB_PASSWORD:changeme}
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+
+# JPA / Hibernate
+spring.jpa.show-sql=true
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.open-in-view=false
+
+# Swagger/OpenAPI Configuration
+springdoc.api-docs.path=/api-docs
+springdoc.swagger-ui.path=/swagger-ui.html
+
+# KYC Vendor / Agent Configuration
+# Pointing to the Python Agent Service (Cloud Run)
+kyc.vendor.url=${KYC_AGENT_URL:http://localhost:8000}
+kyc.vendor.token=${KYC_VENDOR_TOKEN:your-token-here}
+kyc.webhook.secret=${KYC_WEBHOOK_SECRET:your-secret-here}
