@@ -12,19 +12,19 @@ AI-powered Know Your Customer (KYC) verification using Google's Agent Developmen
 
 ## Architecture
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Next.js UI    │────▶│  Spring Boot    │────▶│  Agent Service  │
-│   (Port 3000)   │     │   (Port 8080)   │     │  (Cloud Run)    │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                                                        │
-                              ┌─────────────────────────┼─────────────────────────┐
-                              ▼                         ▼                         ▼
-                    ┌──────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-                    │ Document_Checker │     │ External_Search  │     │ Wealth_Calculator│
-                    │ Resume_Crosscheck│     │ (PEP/Sanctions)  │     │                  │
-                    └──────────────────┘     └──────────────────┘     └──────────────────┘
-```
+![KYC Multi-Agent Architecture](docs/architecture.png)
+
+### Agent Workflow
+1. **User Request** → Initiates KYC verification
+2. **Root KYC Agent Orchestrator** → Coordinates all sub-agents
+3. **Sub-Agents** (parallel execution):
+   - **Internal DB Check** → BigQuery lookup for existing records
+   - **Document Checker** → Analyzes KTP, passport, bank statements
+   - **Resume Crosschecker** → Verifies employment via LinkedIn
+   - **External Search Agent** → PEP/Sanctions screening + adverse media
+   - **Wealth Calculator** → Assesses financial profile
+4. **Google Search Grounding** → Real-time public data verification
+5. **Final KYC Report** → Consolidated risk assessment
 
 ## Quick Start
 
