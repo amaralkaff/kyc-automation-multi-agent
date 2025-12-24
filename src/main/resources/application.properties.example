@@ -24,3 +24,6 @@ springdoc.swagger-ui.path=/swagger-ui.html
 kyc.vendor.url=${KYC_AGENT_URL:http://localhost:8000}
 kyc.vendor.token=${KYC_VENDOR_TOKEN:your-token-here}
 kyc.webhook.secret=${KYC_WEBHOOK_SECRET:your-secret-here}
+
+# JWT Configuration (generate a 256-bit base64 encoded key)
+jwt.secret.key=${JWT_SECRET_KEY:your-256-bit-secret-key-base64-encoded}

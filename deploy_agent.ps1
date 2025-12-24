@@ -2,7 +2,13 @@ $PROJECT_ID = "job-screening-app-2025"
 $REGION = "us-central1"
 $REPO_NAME = "kyc-agents"
 $IMAGE_NAME = "agent-service"
-$API_KEY = "AIzaSyAaSryxatD-iaYbznOdPrxcEUHaLW324TY"
+
+# API Key should be set as environment variable
+if (-not $env:GOOGLE_API_KEY) {
+    Write-Host "ERROR: GOOGLE_API_KEY environment variable not set" -ForegroundColor Red
+    exit 1
+}
+$API_KEY = $env:GOOGLE_API_KEY
 
 Write-Host "1. Enabling APIs..."
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com --project $PROJECT_ID
