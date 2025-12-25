@@ -128,16 +128,52 @@ export default function ApplicationDetailPage() {
           </div>
         </div>
         {application.status === "DRAFT" && (
-          <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <FileCheck className="mr-2 h-4 w-4" />
-            )}
-            Submit for Review
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href={`/applications/${application.id}/upload`}>
+                <FileText className="mr-2 h-4 w-4" />
+                Upload Documents
+              </Link>
+            </Button>
+            <Button onClick={handleSubmit} disabled={submitting}>
+              {submitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <FileCheck className="mr-2 h-4 w-4" />
+              )}
+              Submit for Review
+            </Button>
+          </div>
         )}
       </div>
+
+      {/* Readiness Checklist */}
+      {application.status === "DRAFT" && (
+        <Card className="bg-slate-50 border-slate-200">
+          <CardHeader>
+            <CardTitle className="text-lg">Application Readiness</CardTitle>
+            <CardDescription>Complete these steps to ensure a high-confidence AI analysis.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="flex items-center gap-2">
+              {application.customer?.linkedinUrl ? <CheckCircle2 className="text-green-500 h-5 w-5" /> : <XCircle className="text-red-400 h-5 w-5" />}
+              <span className={application.customer?.linkedinUrl ? "font-medium" : "text-muted-foreground"}>LinkedIn Profile (Found)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {application.documents?.some(d => d.documentType === 'KTP_FRONT' || d.documentType === 'PASSPORT') ? <CheckCircle2 className="text-green-500 h-5 w-5" /> : <XCircle className="text-red-400 h-5 w-5" />}
+              <span className={application.documents?.some(d => d.documentType === 'KTP_FRONT' || d.documentType === 'PASSPORT') ? "font-medium" : "text-muted-foreground"}>ID Document (Uploaded)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {application.documents?.some(d => d.documentType === 'BANK_STATEMENT') ? <CheckCircle2 className="text-green-500 h-5 w-5" /> : <XCircle className="text-red-400 h-5 w-5" />}
+              <span className={application.documents?.some(d => d.documentType === 'BANK_STATEMENT') ? "font-medium" : "text-muted-foreground"}>Bank Statement (Uploaded)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {application.customer?.companyName ? <CheckCircle2 className="text-green-500 h-5 w-5" /> : <XCircle className="text-red-400 h-5 w-5" />}
+              <span className={application.customer?.companyName ? "font-medium" : "text-muted-foreground"}>Company Name (Verified)</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 md:grid-cols-3">
         {/* Risk Score */}
@@ -148,13 +184,12 @@ export default function ApplicationDetailPage() {
           <CardContent>
             <div className="flex items-center gap-3">
               <div
-                className={`text-4xl font-bold ${
-                  risk.color === "green"
-                    ? "text-green-600"
-                    : risk.color === "yellow"
+                className={`text-4xl font-bold ${risk.color === "green"
+                  ? "text-green-600"
+                  : risk.color === "yellow"
                     ? "text-yellow-600"
                     : "text-red-600"
-                }`}
+                  }`}
               >
                 {application.riskScore ?? "N/A"}
               </div>
@@ -164,8 +199,8 @@ export default function ApplicationDetailPage() {
                     risk.color === "green"
                       ? "bg-green-500"
                       : risk.color === "yellow"
-                      ? "bg-yellow-500"
-                      : "bg-red-500"
+                        ? "bg-yellow-500"
+                        : "bg-red-500"
                   }
                 >
                   {risk.level}
@@ -227,6 +262,7 @@ export default function ApplicationDetailPage() {
           <TabsTrigger value="document">Document Check</TabsTrigger>
           <TabsTrigger value="resume">Resume Check</TabsTrigger>
           <TabsTrigger value="external">External Search</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="wealth">Wealth Analysis</TabsTrigger>
         </TabsList>
 
@@ -351,7 +387,7 @@ export default function ApplicationDetailPage() {
                   </Badge>
                 </div>
               </div>
-              
+
               {application.externalSearchResult ? (
                 <pre className="text-sm bg-muted p-4 rounded-md overflow-auto">
                   {JSON.stringify(parseJsonSafe(application.externalSearchResult), null, 2)}
@@ -367,6 +403,45 @@ export default function ApplicationDetailPage() {
                     {JSON.stringify(parseJsonSafe(application.adverseMediaSources), null, 2)}
                   </pre>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="documents">
+          <Card>
+            <CardHeader>
+              <CardTitle>Uploaded Documents</CardTitle>
+              <CardDescription>Files associated with this application</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {application.documents && application.documents.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {application.documents.map((doc) => (
+                    <Card key={doc.id} className="overflow-hidden">
+                      <div className="p-4 flex items-start gap-4">
+                        <div className="bg-blue-100 p-2 rounded text-blue-600">
+                          <FileText className="h-6 w-6" />
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <p className="font-semibold truncate" title={doc.fileName}>{doc.fileName}</p>
+                          <Badge variant="outline" className="mt-1">
+                            {doc.documentType.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="bg-slate-50 px-4 py-3 border-t flex justify-end">
+                        <Button variant="ghost" size="sm" asChild>
+                          <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                            View File <ArrowLeft className="h-3 w-3 rotate-180" />
+                          </a>
+                        </Button>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">No documents uploaded yet.</p>
               )}
             </CardContent>
           </Card>

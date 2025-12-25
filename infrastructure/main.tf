@@ -1,19 +1,27 @@
 provider "google" {
-  project = "your-gcp-project-id"
+  project = "job-screening-app-2025"
   region  = "us-central1"
 }
 
 # 1. Enable Required APIs
 resource "google_project_service" "vertex_ai" {
-  service = "aiplatform.googleapis.com"
+  service            = "aiplatform.googleapis.com"
+  disable_on_destroy = false
 }
 
 resource "google_project_service" "bigquery" {
-  service = "bigquery.googleapis.com"
+  service            = "bigquery.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "cloud_run" {
+  service            = "run.googleapis.com"
+  disable_on_destroy = false
 }
 
 resource "google_project_service" "discovery_engine" {
-  service = "discoveryengine.googleapis.com" # For Search Grounding
+  service            = "discoveryengine.googleapis.com" # For Search Grounding
+  disable_on_destroy = false
 }
 
 # 2. BigQuery Setup

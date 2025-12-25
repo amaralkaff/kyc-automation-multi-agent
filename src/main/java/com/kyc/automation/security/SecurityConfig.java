@@ -24,18 +24,23 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(request -> {
                     var corsConfiguration = new org.springframework.web.cors.CorsConfiguration();
-                    corsConfiguration.setAllowedOrigins(java.util.List.of("http://localhost:3000"));
+                    corsConfiguration
+                            .setAllowedOrigins(java.util.List.of("http://localhost:3000", "http://localhost:8080"));
                     corsConfiguration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-                    corsConfiguration.setAllowedHeaders(java.util.List.of("*"));
+                    corsConfiguration.setAllowedHeaders(
+                            java.util.List.of("Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin",
+                                    "Access-Control-Request-Method", "Access-Control-Request-Headers"));
+                    corsConfiguration.setExposedHeaders(java.util.List.of("Authorization", "Content-Disposition"));
+                    corsConfiguration.setAllowCredentials(true);
                     return corsConfiguration;
                 }))
                 .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests(req ->
-                        req.requestMatchers("/api/auth/**", "/swagger-ui/**", "/api-docs/**", "/", "/h2-console/**", "/swagger-ui.html")
-                                .permitAll()
-                                .anyRequest()
-                                .authenticated()
-                )
+                .authorizeHttpRequests(req -> req
+                        .requestMatchers("/api/auth/**", "/swagger-ui/**", "/api-docs/**", "/", "/h2-console/**",
+                                "/swagger-ui.html")
+                        .permitAll()
+                        .anyRequest()
+                        .authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

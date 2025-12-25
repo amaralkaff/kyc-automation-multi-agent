@@ -46,7 +46,7 @@ public class KycService {
 
         return applicationRepository.save(application);
     }
-    
+
     // uploadDocument method remains unchanged...
 
     @Transactional
@@ -54,7 +54,8 @@ public class KycService {
         KycApplication application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new RuntimeException("Application not found"));
 
-        if (application.getStatus() != KycStatus.DRAFT && application.getStatus() != KycStatus.UNDER_REVIEW && application.getStatus() != KycStatus.ACTION_REQUIRED) {
+        if (application.getStatus() != KycStatus.DRAFT && application.getStatus() != KycStatus.UNDER_REVIEW
+                && application.getStatus() != KycStatus.ACTION_REQUIRED) {
             throw new RuntimeException("Cannot upload documents to a finalized application");
         }
 
@@ -81,7 +82,7 @@ public class KycService {
         // Call Python Agent Service via AgenticKycService
         try {
             Customer customer = application.getCustomer();
-            
+
             // Collect all document URLs associated with this application
             List<String> docUrls = application.getDocuments().stream()
                     .map(KycDocument::getFileUrl)
@@ -94,17 +95,16 @@ public class KycService {
                     customer.getNationalId(),
                     docUrls,
                     customer.getLinkedinUrl(),
-                    customer.getCompanyName()
-            );
+                    customer.getCompanyName());
 
             // HITL Logic:
             // Agent will only return APPROVED for very low risk.
             // Everything else (Medium/High Risk) comes back as UNDER_REVIEW.
-            
+
             KycStatus newStatus;
             boolean manualReview = report.requiresManualReview() != null ? report.requiresManualReview() : true;
 
-            if ("APPROVED".equalsIgnoreCase(report.status()) && report.riskScore() < 20) {
+            if ("APPROVED".equalsIgnoreCase(report.status()) && report.riskScore() <= 30) {
                 newStatus = KycStatus.APPROVED;
                 manualReview = false;
             } else {
@@ -116,11 +116,11 @@ public class KycService {
             application.setAdminComments(report.reasoning());
             application.setCaseId(report.caseId());
             application.setRequiresManualReview(manualReview);
-            
+
             // Store full details/citations as JSON
             if (report.details() != null) {
                 application.setAgentReport(objectMapper.writeValueAsString(report.details()));
-                
+
                 // Parse and store sub-agent results separately for easy querying
                 AgenticKycService.SubAgentResults subResults = agenticKycService.parseSubAgentResults(report.details());
                 if (subResults != null) {
@@ -129,24 +129,24 @@ public class KycService {
                     application.setExternalSearchResult(subResults.externalSearch());
                     application.setWealthCalculatorResult(subResults.wealthCalculator());
                 }
-                
+
                 // Extract risk breakdown flags
                 Object riskBreakdown = report.details().get("risk_breakdown");
                 if (riskBreakdown instanceof java.util.Map<?, ?> rb) {
                     application.setAdverseMediaFound(Boolean.TRUE.equals(rb.get("adverse_media")));
                     application.setSanctionsMatch(Boolean.TRUE.equals(rb.get("sanctions_flag")));
-                    
+
                     String pepStatus = rb.get("pep_status") != null ? rb.get("pep_status").toString() : null;
                     application.setPepMatch("POTENTIAL_PEP".equals(pepStatus) || "CONFIRMED_PEP".equals(pepStatus));
                 }
-                
+
                 // Extract citations for display
                 Object citations = report.details().get("citations");
                 if (citations instanceof java.util.List<?> citationList && !citationList.isEmpty()) {
                     application.setAdverseMediaSources(objectMapper.writeValueAsString(citationList));
                 }
             }
-            
+
         } catch (Exception e) {
             // If Agent fails, force manual review
             application.setAdminComments("Agent Analysis Failed: " + e.getMessage());
@@ -161,23 +161,27 @@ public class KycService {
     public void processWebhookEvent(String rawPayload) {
         try {
             JsonNode root = objectMapper.readTree(rawPayload);
-            
+
             // Assume payload has: providerApplicantId, status, riskScore
             String providerId = root.path("providerApplicantId").asText();
             String statusStr = root.path("status").asText().toUpperCase();
             int riskScore = root.path("riskScore").asInt(0);
-            
+
             // Find application by provider ID (In a real app, you'd index this field)
-            // For now, we might need a way to find it. 
-            // Simplified: we assume the payload includes our internal applicationId for this demo, 
+            // For now, we might need a way to find it.
+            // Simplified: we assume the payload includes our internal applicationId for
+            // this demo,
             // OR we'd need to add findByProviderApplicantId to the repository.
-            // Let's assume the payload sends back our "externalUserId" which matches our Customer ID, 
+            // Let's assume the payload sends back our "externalUserId" which matches our
+            // Customer ID,
             // or we use a repository method.
-            
-            // Fallback for this demo: Try to find by ID if passed, or just update the latest for a customer?
-            // Let's add findByProviderApplicantId to Repo in next step if needed, or iterate.
+
+            // Fallback for this demo: Try to find by ID if passed, or just update the
+            // latest for a customer?
+            // Let's add findByProviderApplicantId to Repo in next step if needed, or
+            // iterate.
             // BETTER: The initiateApplication stored 'sdkToken' in providerApplicantId.
-            
+
             KycApplication application = applicationRepository.findAll().stream()
                     .filter(app -> providerId.equals(app.getProviderApplicantId()))
                     .findFirst()
@@ -193,11 +197,12 @@ public class KycService {
             application.setStatus(newStatus);
             application.setRiskScore(riskScore);
             application.setRiskLabels(root.path("riskLabels").toString());
-            
+
             applicationRepository.save(application);
 
             // Publish Event
-            eventPublisher.publishEvent(new KycCompletedEvent(this, application.getId(), application.getCustomer().getId(), newStatus));
+            eventPublisher.publishEvent(
+                    new KycCompletedEvent(this, application.getId(), application.getCustomer().getId(), newStatus));
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to process webhook", e);
@@ -212,7 +217,7 @@ public class KycService {
         return applicationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Application not found"));
     }
-    
+
     public List<KycApplication> getCustomerApplications(Long customerId) {
         return applicationRepository.findByCustomerId(customerId);
     }
@@ -240,60 +245,58 @@ public class KycService {
     @Transactional
     public KycApplication approveApplication(Long applicationId, String comment, String reviewerName) {
         KycApplication application = getApplication(applicationId);
-        
+
         application.setStatus(KycStatus.APPROVED);
         application.setRequiresManualReview(false);
         application.setReviewedBy(reviewerName);
         application.setReviewedAt(java.time.LocalDateTime.now());
-        
+
         if (comment != null && !comment.isBlank()) {
             String existingComments = application.getAdminComments();
             application.setAdminComments(
-                    (existingComments != null ? existingComments + " | " : "") + 
-                    "Manual Approval: " + comment
-            );
+                    (existingComments != null ? existingComments + " | " : "") +
+                            "Manual Approval: " + comment);
         }
-        
+
         KycApplication saved = applicationRepository.save(application);
-        
+
         // Publish event
         eventPublisher.publishEvent(new KycCompletedEvent(
                 this, application.getId(), application.getCustomer().getId(), KycStatus.APPROVED));
-        
+
         return saved;
     }
 
     @Transactional
     public KycApplication rejectApplication(Long applicationId, String reason, String reviewerName) {
         KycApplication application = getApplication(applicationId);
-        
+
         application.setStatus(KycStatus.REJECTED);
         application.setRequiresManualReview(false);
         application.setRejectionReason(reason);
         application.setReviewedBy(reviewerName);
         application.setReviewedAt(java.time.LocalDateTime.now());
-        
+
         KycApplication saved = applicationRepository.save(application);
-        
+
         // Publish event
         eventPublisher.publishEvent(new KycCompletedEvent(
                 this, application.getId(), application.getCustomer().getId(), KycStatus.REJECTED));
-        
+
         return saved;
     }
 
     @Transactional
     public KycApplication requestAdditionalInfo(Long applicationId, String comment, String reviewerName) {
         KycApplication application = getApplication(applicationId);
-        
+
         application.setStatus(KycStatus.ACTION_REQUIRED);
         application.setReviewedBy(reviewerName);
         application.setReviewedAt(java.time.LocalDateTime.now());
         application.setAdminComments(
-                (application.getAdminComments() != null ? application.getAdminComments() + " | " : "") + 
-                "Additional Info Requested: " + comment
-        );
-        
+                (application.getAdminComments() != null ? application.getAdminComments() + " | " : "") +
+                        "Additional Info Requested: " + comment);
+
         return applicationRepository.save(application);
     }
 
@@ -303,7 +306,7 @@ public class KycService {
 
     public java.util.Map<String, Object> getAnalyticsSummary() {
         List<KycApplication> allApps = applicationRepository.findAll();
-        
+
         long total = allApps.size();
         long approved = allApps.stream().filter(a -> a.getStatus() == KycStatus.APPROVED).count();
         long rejected = allApps.stream().filter(a -> a.getStatus() == KycStatus.REJECTED).count();
@@ -312,14 +315,14 @@ public class KycService {
         long pepMatches = allApps.stream().filter(a -> Boolean.TRUE.equals(a.getPepMatch())).count();
         long sanctionsMatches = allApps.stream().filter(a -> Boolean.TRUE.equals(a.getSanctionsMatch())).count();
         long adverseMediaCases = allApps.stream().filter(a -> Boolean.TRUE.equals(a.getAdverseMediaFound())).count();
-        
+
         // Calculate average risk score (only for apps with a score)
         double avgRiskScore = allApps.stream()
                 .filter(a -> a.getRiskScore() != null)
                 .mapToInt(KycApplication::getRiskScore)
                 .average()
                 .orElse(0.0);
-        
+
         return java.util.Map.of(
                 "total", total,
                 "approved", approved,
@@ -329,7 +332,6 @@ public class KycService {
                 "pepMatches", pepMatches,
                 "sanctionsMatches", sanctionsMatches,
                 "adverseMediaCases", adverseMediaCases,
-                "averageRiskScore", Math.round(avgRiskScore * 100.0) / 100.0
-        );
+                "averageRiskScore", Math.round(avgRiskScore * 100.0) / 100.0);
     }
 }

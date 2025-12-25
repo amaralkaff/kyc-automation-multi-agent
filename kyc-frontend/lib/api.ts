@@ -5,7 +5,7 @@ import axios from 'axios';
 // ============================================================================
 
 // Enum: KycStatus
-export type KycStatus = 
+export type KycStatus =
   | 'DRAFT'
   | 'SUBMITTED'
   | 'UNDER_REVIEW'
@@ -14,17 +14,21 @@ export type KycStatus =
   | 'ACTION_REQUIRED';
 
 // Enum: DocumentType (Indonesian KYC Documents)
-export type DocumentType = 
+export type DocumentType =
   | 'KTP_FRONT'           // Kartu Tanda Penduduk - depan
   | 'KTP_BACK'            // Kartu Tanda Penduduk - belakang
+  | 'NATIONAL_ID_FRONT'   // Legacy
+  | 'NATIONAL_ID_BACK'    // Legacy
   | 'PASSPORT'
   | 'KITAS'               // Kartu Izin Tinggal Terbatas (temporary stay permit)
   | 'KITAP'               // Kartu Izin Tinggal Tetap (permanent stay permit)
+  | 'SELFIE'              // Selfie
   | 'SELFIE_WITH_KTP'     // Selfie holding KTP
   | 'BANK_STATEMENT'
   | 'REKENING_KORAN'      // Bank statement (Indonesian term)
   | 'SPT_PAJAK'           // Surat Pemberitahuan Tahunan (annual tax return)
   | 'SLIP_GAJI'           // Salary slip
+  | 'UTILITY_BILL'        // Utility bill
   | 'KARTU_KELUARGA'      // Family card
   | 'SURAT_DOMISILI'      // Domicile letter
   | 'RESUME'              // CV/Resume for crosschecking
@@ -44,15 +48,15 @@ export interface Customer {
   lastName: string;
   email: string;
   dateOfBirth: string; // ISO date string
-  
+
   // Indonesian Identity
   nik: string;                // Nomor Induk Kependudukan (16 digits)
   nationalId?: string;        // Passport number for WNA
   citizenship: Citizenship;
-  
+
   // Contact
   phoneNumber: string;
-  
+
   // Indonesian Address Hierarchy
   address: string;            // Street address
   kelurahan?: string;         // Village/Sub-district
@@ -60,16 +64,16 @@ export interface Customer {
   kabupaten?: string;         // Regency/City
   provinsi?: string;          // Province
   postalCode?: string;
-  
+
   // Employment Info (for wealth verification)
   occupation?: string;
   companyName?: string;
   linkedinUrl?: string;
-  
+
   // Risk Assessment
   riskLevel?: RiskLevel;
   netWorth?: number;
-  
+
   kycApplications?: KycApplication[];
 }
 
@@ -86,37 +90,37 @@ export interface KycApplication {
   id: number;
   customer?: Customer;
   status: KycStatus;
-  
+
   // Overall Risk Assessment
   riskScore: number | null;          // 0-100 (High score = Low Risk)
   riskLabels: string | null;
-  
+
   // ADK Agent Results
   caseId: string | null;             // From ADK Agent
   agentReport: string | null;        // Full JSON report from Agent
-  
+
   // Sub-Agent Results (Google ADK Pattern)
   documentCheckerResult: string | null;     // Document_Checker agent output
   resumeCrosscheckerResult: string | null;  // Resume_Crosschecker agent output
   externalSearchResult: string | null;      // External_Search agent output
   wealthCalculatorResult: string | null;    // Wealth_Calculator agent output
-  
+
   // External Search Flags
   pepMatch: boolean;                 // Politically Exposed Person
   sanctionsMatch: boolean;           // OFAC/UN Sanctions list
   adverseMediaFound: boolean;        // Negative news
   adverseMediaSources: string | null;
-  
+
   // Manual Review
   requiresManualReview: boolean | null;
   adminComments: string | null;
   rejectionReason: string | null;
   reviewedBy: string | null;
   reviewedAt: string | null;
-  
+
   // Provider Integration
   providerApplicantId: string | null;
-  
+
   // Documents & Timestamps
   documents: KycDocument[];
   createdAt: string;
@@ -159,15 +163,15 @@ export interface CreateCustomerRequest {
   lastName: string;
   email: string;
   dateOfBirth: string;
-  
+
   // Indonesian Identity
   nik: string;                // Required: 16-digit NIK
   nationalId?: string;        // Optional: Passport for WNA
   citizenship: Citizenship;
-  
+
   // Contact
   phoneNumber: string;
-  
+
   // Indonesian Address
   address: string;
   kelurahan?: string;
@@ -175,7 +179,7 @@ export interface CreateCustomerRequest {
   kabupaten?: string;
   provinsi?: string;
   postalCode?: string;
-  
+
   // Employment (Optional)
   occupation?: string;
   companyName?: string;
@@ -301,6 +305,7 @@ export const updateCustomer = async (id: number, customer: CreateCustomerRequest
  */
 export const deleteCustomer = async (id: number): Promise<void> => {
   await api.delete(`/customers/${id}`);
+  return;
 };
 
 // ============================================================================
@@ -330,13 +335,14 @@ export const uploadKycDocument = async (
   formData.append('file', file);
   formData.append('type', documentType);
 
+  const token = localStorage.getItem('token');
   const response = await api.post<KycDocument>(
     `/kyc/${applicationId}/upload`,
     formData,
     {
       headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+        'Authorization': `Bearer ${token}`
+      }
     }
   );
   return response.data;
@@ -407,7 +413,7 @@ export const approveApplication = async (
 ): Promise<KycApplication> => {
   const params = new URLSearchParams({ reviewerName });
   if (comment) params.append('comment', comment);
-  
+
   const response = await api.post<KycApplication>(
     `/kyc/${applicationId}/approve?${params.toString()}`
   );
@@ -424,7 +430,7 @@ export const rejectApplication = async (
   reviewerName: string
 ): Promise<KycApplication> => {
   const params = new URLSearchParams({ reason, reviewerName });
-  
+
   const response = await api.post<KycApplication>(
     `/kyc/${applicationId}/reject?${params.toString()}`
   );
@@ -441,7 +447,7 @@ export const requestAdditionalInfo = async (
   reviewerName: string
 ): Promise<KycApplication> => {
   const params = new URLSearchParams({ comment, reviewerName });
-  
+
   const response = await api.post<KycApplication>(
     `/kyc/${applicationId}/request-info?${params.toString()}`
   );
@@ -511,14 +517,18 @@ export const getDocumentTypeLabel = (type: DocumentType): string => {
   const labels: Record<DocumentType, string> = {
     KTP_FRONT: 'KTP (Depan)',
     KTP_BACK: 'KTP (Belakang)',
+    NATIONAL_ID_FRONT: 'National ID (Front)',
+    NATIONAL_ID_BACK: 'National ID (Back)',
     PASSPORT: 'Passport',
     KITAS: 'KITAS',
     KITAP: 'KITAP',
+    SELFIE: 'Selfie',
     SELFIE_WITH_KTP: 'Selfie dengan KTP',
     BANK_STATEMENT: 'Bank Statement',
     REKENING_KORAN: 'Rekening Koran',
     SPT_PAJAK: 'SPT Pajak',
     SLIP_GAJI: 'Slip Gaji',
+    UTILITY_BILL: 'Tagihan Utilitas',
     KARTU_KELUARGA: 'Kartu Keluarga',
     SURAT_DOMISILI: 'Surat Domisili',
     RESUME: 'Resume/CV',
@@ -539,18 +549,15 @@ export const getRiskLevel = (score: number | null): { level: string; color: stri
 };
 
 // ============================================================================
-// KYC Agent Service API (Google ADK - Cloud Run)
-// Configure via NEXT_PUBLIC_KYC_AGENT_URL environment variable
+// KYC Agent Service API (Proxied via Backend)
 // ============================================================================
-
-const KYC_AGENT_URL = process.env.NEXT_PUBLIC_KYC_AGENT_URL;
 
 // Agent Service Types
 export interface KycAgentRequest {
   customer_id: string;
   name: string;
   nik?: string;
-  files?: string[]; // List of document URLs/paths
+  files?: string[];
 }
 
 export interface KycAgentResponse {
@@ -582,44 +589,38 @@ export interface KycAgentResponse {
 export interface AgentHealthCheck {
   status: string;
   service: string;
+  agents_available: string[];
+}
+
+export interface AgentInfo {
+  name: string;
+  model: string;
+  description: string;
+  tools: string[];
+}
+
+export interface ServiceInfo {
+  service: string;
+  version: string;
+  agents: AgentInfo[];
 }
 
 /**
- * Check KYC Agent Service health
- * GET /
+ * Check KYC Agent Service health (via Backend Proxy)
+ * GET /api/kyc/agent/health
  */
 export const checkAgentHealth = async (): Promise<AgentHealthCheck> => {
-  const response = await axios.get<AgentHealthCheck>(KYC_AGENT_URL);
+  const response = await api.get<AgentHealthCheck>('/kyc/agent/health');
   return response.data;
 };
 
 /**
- * Analyze customer using KYC Agent (Google ADK Multi-Agent)
- * POST /analyze
- * 
- * This triggers the full KYC workflow:
- * 1. BigQuery check for existing profiles
- * 2. Document_Checker - Analyzes ID documents
- * 3. Resume_Crosschecker - Verifies employment via web search
- * 4. External_Search - Adverse media, PEP, sanctions screening
- * 5. Wealth_Calculator - Calculates net worth from bank statements
+ * Get KYC Agent Service Info (via Backend Proxy)
+ * GET /api/kyc/agent/info
  */
-export const analyzeKycWithAgent = async (request: KycAgentRequest): Promise<KycAgentResponse> => {
-  const response = await axios.post<KycAgentResponse>(`${KYC_AGENT_URL}/analyze`, request);
+export const getAgentServiceInfo = async (): Promise<ServiceInfo> => {
+  const response = await api.get<ServiceInfo>('/kyc/agent/info');
   return response.data;
-};
-
-/**
- * Convenience function to run agent analysis for a customer
- */
-export const runAgentAnalysis = async (customer: Customer, documentUrls?: string[]): Promise<KycAgentResponse> => {
-  const request: KycAgentRequest = {
-    customer_id: customer.id.toString(),
-    name: `${customer.firstName} ${customer.lastName}`,
-    nik: customer.nationalId || undefined,
-    files: documentUrls,
-  };
-  return analyzeKycWithAgent(request);
 };
 
 export default api;
